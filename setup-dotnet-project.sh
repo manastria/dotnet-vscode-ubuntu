@@ -88,6 +88,8 @@ install_vsix() {
     fi
 }
 
+apt install --install-suggests -y dotnet-sdk-10.0
+
 # ------------------------------------------------------------
 # ÉTAPE 1 — Téléchargement des extensions VS Code
 # ------------------------------------------------------------
