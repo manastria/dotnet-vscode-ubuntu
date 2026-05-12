@@ -1,0 +1,22 @@
+[Unit]
+Description=Cache .NET pour postes étudiants (HTTP)
+Documentation=file:///home/prof/cache-dotnet/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Ajustez User et WorkingDirectory si le compte enseignant n'est pas "prof"
+User=prof
+Group=prof
+WorkingDirectory=/home/prof/cache-dotnet
+ExecStart=/usr/bin/python3 -m http.server 8000 --bind 0.0.0.0
+Restart=on-failure
+RestartSec=5s
+
+# Hardening minimal (le serveur n'écrit rien, ne lit que dans WorkingDirectory)
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
