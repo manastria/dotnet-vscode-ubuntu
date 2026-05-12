@@ -1,27 +1,22 @@
 #!/bin/bash
 
 # ============================================================
-# setup-dotnet-project.sh
-# Prérequis  : dotnet SDK, VS Code, curl, python3
-# Usage      : bash setup-dotnet-project.sh
+# create-dotnet-project.sh
+# Crée un nouveau projet .NET console avec sa configuration VS Code
+# (launch.json + tasks.json), prêt à être débogué avec F5.
+#
+# Prérequis : dotnet SDK, VS Code
+#             (les extensions doivent avoir été installées au préalable
+#              via install-dotnet-deps.sh)
+# Usage     : bash create-dotnet-project.sh
 # ============================================================
 
 SCRIPT_DIR="$(dirname "$(realpath "$0")")"
-VSIX_DIR="${SCRIPT_DIR}/vsix"
-VSDBG_DIR="$HOME/.vsdbg"
-PLATFORM="linux-x64"
 DOTNET_INSTALL_CMD="apt install --install-suggests -y dotnet-sdk-10.0"
 VSCODE_INSTALL_SCRIPT="${SCRIPT_DIR}/install-vscode.sh"
 
-# Extensions requises, dans l'ordre d'installation
-EXTENSIONS=(
-    "ms-dotnettools.vscode-dotnet-runtime"
-    "ms-dotnettools.csharp"
-    "ms-dotnettools.csdevkit"
-)
-
 # ------------------------------------------------------------
-# Couleurs (désactivées hors terminal, ex: redirection vers fichier)
+# Couleurs (désactivées hors terminal)
 # ------------------------------------------------------------
 if [ -t 1 ]; then
     C_RESET=$'\033[0m'
@@ -44,95 +39,8 @@ error()   { echo "  ${C_RED}✗${C_RESET} $*"; }
 note()    { echo "${C_MAGENTA}$*${C_RESET}"; }
 
 # ------------------------------------------------------------
-# Fonctions utilitaires
+# Vérification des prérequis
 # ------------------------------------------------------------
-
-get_latest_version() {
-    local extension_id="$1"
-    local publisher="${extension_id%%.*}"
-    local package="${extension_id##*.}"
-    curl -s -X POST "https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery" \
-        -H "Content-Type: application/json" \
-        -H "Accept: application/json;api-version=7.1-preview.1" \
-        -d "{\"filters\":[{\"criteria\":[{\"filterType\":7,\"value\":\"${extension_id}\"}]}],\"flags\":529}" \
-        | python3 -c "import sys,json; data=json.load(sys.stdin); print(data['results'][0]['extensions'][0]['versions'][0]['version'])" 2>/dev/null
-}
-
-is_valid_zip() {
-    # Vérifie la magic signature ZIP (PK = 0x504B)
-    local file="$1"
-    [ -f "$file" ] && [ "$(xxd -p -l 2 "$file")" = "504b" ]
-}
-
-download_vsix() {
-    local extension_id="$1"
-    local publisher="${extension_id%%.*}"
-    local package="${extension_id##*.}"
-
-    info "Récupération de la version de ${C_BOLD}${extension_id}${C_RESET}..."
-    local version
-    version=$(get_latest_version "$extension_id")
-
-    if [ -z "$version" ]; then
-        error "Impossible de récupérer la version de ${extension_id}. Vérifiez la connexion."
-        return 1
-    fi
-
-    local filename="${extension_id}-${version}.vsix"
-    local filepath="${VSIX_DIR}/${filename}"
-
-    if [ -f "$filepath" ]; then
-        success "Déjà présent : ${filename}"
-        return 0
-    fi
-
-    local base_url="https://marketplace.visualstudio.com/_apis/public/gallery/publishers/${publisher}/vsextensions/${package}/${version}/vspackage"
-
-    # Tentative 1 : avec targetPlatform
-    # --compressed : indispensable, le marketplace renvoie le VSIX avec Content-Encoding: gzip
-    # --fail       : renvoie une erreur sur HTTP != 2xx au lieu d'enregistrer le corps d'erreur JSON
-    info "Téléchargement de ${filename} (${PLATFORM})..."
-    curl -sSL --compressed --fail -o "$filepath" "${base_url}?targetPlatform=${PLATFORM}"
-
-    if is_valid_zip "$filepath"; then
-        success "Téléchargé : ${filename}"
-        return 0
-    fi
-
-    # Tentative 2 : sans targetPlatform (extension universelle)
-    warn "Pas de build ${PLATFORM}, tentative universelle..."
-    curl -sSL --compressed --fail -o "$filepath" "${base_url}"
-
-    if is_valid_zip "$filepath"; then
-        success "Téléchargé : ${filename} (universel)"
-        return 0
-    fi
-
-    error "Échec du téléchargement de ${filename}"
-    rm -f "$filepath"
-    return 1
-}
-
-install_vsix() {
-    local extension_id="$1"
-    # Cherche le fichier vsix correspondant à cet extension_id
-    local filepath
-    filepath=$(ls "${VSIX_DIR}/${extension_id}-"*.vsix 2>/dev/null | head -1)
-
-    if [ -z "$filepath" ]; then
-        error "Fichier VSIX introuvable pour ${extension_id} dans ${VSIX_DIR}"
-        return 1
-    fi
-
-    info "Installation de $(basename "$filepath")..."
-    code --install-extension "$filepath" --force
-    if [ $? -eq 0 ]; then
-        success "Installé : $(basename "$filepath")"
-    else
-        error "Échec de l'installation de $(basename "$filepath")"
-        return 1
-    fi
-}
 
 check_dotnet() {
     section "Vérification du SDK .NET"
@@ -186,54 +94,15 @@ check_vscode() {
     exit 1
 }
 
-# ------------------------------------------------------------
-# ÉTAPE 0 — Vérification des prérequis (dotnet, VS Code)
-# ------------------------------------------------------------
+# ============================================================
+# Exécution
+# ============================================================
 
 check_dotnet
 check_vscode
 
 # ------------------------------------------------------------
-# ÉTAPE 1 — Téléchargement des extensions VS Code
-# ------------------------------------------------------------
-
-section "Extensions VS Code"
-mkdir -p "$VSIX_DIR"
-
-for ext in "${EXTENSIONS[@]}"; do
-    download_vsix "$ext"
-done
-
-# ------------------------------------------------------------
-# ÉTAPE 2 — Installation des extensions VS Code
-# ------------------------------------------------------------
-
-section "Installation des extensions VS Code"
-
-for ext in "${EXTENSIONS[@]}"; do
-    install_vsix "$ext"
-done
-
-# ------------------------------------------------------------
-# ÉTAPE 3 — Installation de vsdbg
-# ------------------------------------------------------------
-
-section "Débogueur vsdbg"
-
-if [ -f "$VSDBG_DIR/vsdbg" ]; then
-    success "vsdbg déjà installé dans $VSDBG_DIR"
-else
-    info "Installation de vsdbg dans $VSDBG_DIR..."
-    curl -sSL https://aka.ms/getvsdbgsh | bash /dev/stdin -v latest -l "$VSDBG_DIR" -r "$PLATFORM"
-    if [ $? -eq 0 ]; then
-        success "vsdbg installé"
-    else
-        error "Échec de l'installation de vsdbg"
-    fi
-fi
-
-# ------------------------------------------------------------
-# ÉTAPE 4 — Création du projet .NET
+# Création du projet .NET
 # ------------------------------------------------------------
 
 section "Projet .NET"
@@ -266,7 +135,7 @@ else
 fi
 
 # ------------------------------------------------------------
-# ÉTAPE 5 — Génération de la configuration VS Code
+# Configuration VS Code
 # ------------------------------------------------------------
 
 mkdir -p .vscode
