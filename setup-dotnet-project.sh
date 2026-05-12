@@ -54,7 +54,9 @@ cat > .vscode/launch.json << EOL
             "args": [],
             "cwd": "\${workspaceFolder}",
             "stopAtEntry": false,
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "requireExactSource": false
         }
     ]
 }
@@ -87,4 +89,11 @@ cat > .vscode/tasks.json << EOL
 EOL
 
 echo "--- ✅ Configuration terminée pour $PROJECT_NAME ! ---"
-echo "Ouvrez le dossier $PROJECT_NAME dans Visual Studio Code pour commencer à coder et déboguer."
+echo ""
+echo "IMPORTANT : Ouvrez VS Code depuis CE dossier (pas le dossier parent) :"
+echo "  code ."
+echo ""
+read -p "Ouvrir VS Code maintenant dans $(pwd) ? [o/N] " OPEN_CODE
+if [[ "$OPEN_CODE" =~ ^[oO]$ ]]; then
+    code .
+fi
