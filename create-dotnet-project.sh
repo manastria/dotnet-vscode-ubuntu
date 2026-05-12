@@ -193,7 +193,3 @@ echo ""
 echo "${C_YELLOW}${C_BOLD}IMPORTANT${C_RESET} : Ouvrez VS Code depuis CE dossier (pas le dossier parent) :"
 echo "    ${C_BOLD}code .${C_RESET}"
 echo ""
-read -p "Ouvrir VS Code maintenant dans $(pwd) ? [o/N] " OPEN_CODE
-if [[ "$OPEN_CODE" =~ ^[oO]$ ]]; then
-    code .
-fi
