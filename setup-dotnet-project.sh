@@ -32,6 +32,12 @@ get_latest_version() {
         | python3 -c "import sys,json; data=json.load(sys.stdin); print(data['results'][0]['extensions'][0]['versions'][0]['version'])" 2>/dev/null
 }
 
+is_valid_zip() {
+    # Vérifie la magic signature ZIP (PK = 0x504B)
+    local file="$1"
+    [ -f "$file" ] && [ "$(xxd -p -l 2 "$file")" = "504b" ]
+}
+
 download_vsix() {
     local extension_id="$1"
     local publisher="${extension_id%%.*}"
@@ -54,17 +60,29 @@ download_vsix() {
         return 0
     fi
 
-    local url="https://marketplace.visualstudio.com/_apis/public/gallery/publishers/${publisher}/vsextensions/${package}/${version}/vspackage?targetPlatform=${PLATFORM}"
-    echo "  → Téléchargement de ${filename}..."
-    curl -sSL -o "$filepath" "$url"
+    local base_url="https://marketplace.visualstudio.com/_apis/public/gallery/publishers/${publisher}/vsextensions/${package}/${version}/vspackage"
 
-    if [ $? -eq 0 ]; then
+    # Tentative 1 : avec targetPlatform
+    echo "  → Téléchargement de ${filename} (${PLATFORM})..."
+    curl -sSL -o "$filepath" "${base_url}?targetPlatform=${PLATFORM}"
+
+    if is_valid_zip "$filepath"; then
         echo "  ✓ Téléchargé : ${filename}"
-    else
-        echo "  ✗ Échec du téléchargement de ${filename}"
-        rm -f "$filepath"
-        return 1
+        return 0
     fi
+
+    # Tentative 2 : sans targetPlatform (extension universelle)
+    echo "  ↩ Pas de build ${PLATFORM}, tentative universelle..."
+    curl -sSL -o "$filepath" "${base_url}"
+
+    if is_valid_zip "$filepath"; then
+        echo "  ✓ Téléchargé : ${filename} (universel)"
+        return 0
+    fi
+
+    echo "  ✗ Échec du téléchargement de ${filename}"
+    rm -f "$filepath"
+    return 1
 }
 
 install_vsix() {
@@ -87,8 +105,6 @@ install_vsix() {
         return 1
     fi
 }
-
-apt install --install-suggests -y dotnet-sdk-10.0
 
 # ------------------------------------------------------------
 # ÉTAPE 1 — Téléchargement des extensions VS Code
