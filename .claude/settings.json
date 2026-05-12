@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//tmp/vsix-test/**)",
+      "Bash(python3 -c ' *)",
+      "Bash(rm -f test.vsix)",
+      "Bash(curl -sSL -o test.vsix \"https://marketplace.visualstudio.com/_apis/public/gallery/publishers/ms-dotnettools/vsextensions/csharp/2.136.19/vspackage?targetPlatform=linux-x64\")",
+      "Bash(xxd -l 16 test.vsix)",
+      "Bash(curl -sSL --compressed -o test.vsix \"https://marketplace.visualstudio.com/_apis/public/gallery/publishers/ms-dotnettools/vsextensions/csharp/2.136.19/vspackage?targetPlatform=linux-x64\")",
+      "Bash(xxd -l 4 test.vsix)",
+      "Bash(rm -f *.vsix)",
+      "Bash(bash -c ' *)",
+      "Bash(rm -rf /tmp/vsix-test)",
+      "Bash(bash -n /home/jpdemory/projets/dotnet-vscode-ubuntu/setup-dotnet-project.sh)",
+      "Bash(command -v code)",
+      "Bash(code --version)",
+      "Bash(echo \"code installé : $\\(code --version)"
+    ],
+    "additionalDirectories": [
+      "/tmp/vsix-test"
+    ]
+  }
+}
